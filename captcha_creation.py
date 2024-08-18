@@ -9,7 +9,6 @@ from PIL.ImageFont import FreeTypeFont, truetype
 from io import BytesIO
 
 ColorTuple = t.Union[t.Tuple[int, int, int], t.Tuple[int, int, int, int]]
-DEFAULT_FONTS = ['DroidSansMono.ttf']
 
 def random_color(
     start: int,
@@ -27,21 +26,21 @@ class Captcha:
     lookup_table: list[int] = [int(i * 1.97) for i in range(256)]
     character_offset_dx: tuple[int, int] = (0, 4)
     character_offset_dy: tuple[int, int] = (0, 6)
-    character_rotate: tuple[int, int] = (-30, 30)
+    character_rotate: tuple[int, int] = (-15, 15)
     character_warp_dx: tuple[float, float] = (0.1, 0.3)
     character_warp_dy: tuple[float, float] = (0.2, 0.3)
-    word_space_probability: float = 0.5
-    word_offset_dx: float = 0.25
+    word_space_probability: float = 0.3
+    word_offset_dx: float = 0.15
     
     def __init__(
             self,
-            #width: int = 160,
-            height: int = 60,
+            width: int = 224,
+            height: int = 80,
             fonts: list[str] | None = None,
             font_sizes: tuple[int, ...] | None = None):
-        #self.width = width
+        self.width = width
         self.height = height
-        self.fonts = fonts or DEFAULT_FONTS
+        self.fonts = fonts or [os.path.join('fonts', f) for f in os.listdir('fonts') if f.endswith('.ttf')]
         self.font_sizes = font_sizes or (42, 50, 56)
         self.truefonts: list[FreeTypeFont] = [ truetype(n, s) for n in self.fonts for s in self.font_sizes ]
     
@@ -72,6 +71,7 @@ class Captcha:
             draw.line(((x1, y1), (x1 - 1, y1 - 1)), fill=color, width=width)
             number -= 1
         return image
+
     
     @staticmethod
     def show_image(image: Image, bounding_boxes: list[dict[str, t.Any]] = None) -> Image:
@@ -107,7 +107,6 @@ class Captcha:
             expand=True,
         )
 
-        
         # warp
         dx2 = w * random.uniform(*self.character_warp_dx)
         dy2 = h * random.uniform(*self.character_warp_dy)
@@ -143,18 +142,26 @@ class Captcha:
         """
         
         images: list[Image] = []
-        for c in chars:
-            if random.random() > self.word_space_probability:
-                images.append({"char": " ", "im": self._draw_character(" ", color)})
+        for i in range(len(chars)):
+            c = chars[i]
+            if i != 0 or i != len(chars) - 1:
+                if random.random() > self.word_space_probability:
+                    images.append({"char": " ", "im": self._draw_character(" ", color)})
             images.append({"char": c, "im": self._draw_character(c, color)})
 
-        width = sum([im_c["im"].size[0] for im_c in images]) # lenght for putting all char together
+        text_width = sum([im_c["im"].size[0] for im_c in images]) # lenght for putting all char together
         
-        image = createImage('RGB', (width, self.height), background)
+        if text_width > self.width:
+            return self.create_captcha_image(chars, color, background)
+            
+        image = createImage('RGB', (self.width, self.height), background)
 
-        average = int(width / len(chars)) # average width of each char
+        average = int(text_width / len(chars)) # average width of each char
         rand = int(self.word_offset_dx * average) # random offset
-        offset = int(average * 0.1) # initial offset
+        #offset = int(average * 0.1) # initial offset
+
+        # Calculate initial offset to center the text
+        initial_offset = (self.width - text_width) // 2
 
         bounding_boxes = []
                 
@@ -166,16 +173,21 @@ class Captcha:
             mask = im.convert('L').point(self.lookup_table)
             
             # Save current offset
-            current_offset = offset
+            current_offset = initial_offset
             
-            image.paste(im, (offset, int((self.height - h) / 2)), mask)
+            image.paste(im, (initial_offset, int((self.height - h) / 2)), mask)
             
             # Save bounding box (left, upper, right, lower)
             if c != " ":  # Check if the image is not a space
-                bounding_boxes.append({"char": c, "bb": (current_offset, int((self.height - h) / 2), current_offset + w, int((self.height + h) / 2))})
+                bb = (current_offset - 3, int((self.height - h) / 2) - 3, current_offset + w + 3, int((self.height + h) / 2) + 3)
+                
+                bounding_boxes.append({"char": c, "bb": bb})
             
-            offset = offset + w + random.randint(-rand, 0)
+            initial_offset = initial_offset + w + random.randint(-rand, 0)
 
+        # Apply random noise patterns
+        self.create_noise_dots(image, color, width=2, number=50)
+        
         return image, bounding_boxes
     
     def generate_image(self, chars: str) -> Image:
@@ -183,11 +195,21 @@ class Captcha:
 
         :param chars: text to be generated.
         """
-        background = random_color(238, 255)
-        color = random_color(10, 200, random.randint(220, 255))
+        if (random.random() < 0.5): #light background
+            background = random_color(220, 255)
+            color = random_color(10, 100, random.randint(230, 255))
+            color2 = random_color(10, 100, random.randint(230, 255))
+        else: #dark background
+            background = random_color(0, 50)
+            color = random_color(160, 255, random.randint(230, 255))
+            color2 = random_color(160, 255, random.randint(230, 255))
+        
+        
         im, bb = self.create_captcha_image(chars, color, background)
         self.create_noise_dots(im, color)
         self.create_noise_curve(im, color)
+        self.create_noise_dots(im, color2)
+        self.create_noise_curve(im, color2)
         im = im.filter(SMOOTH)
         return im, bb
     
