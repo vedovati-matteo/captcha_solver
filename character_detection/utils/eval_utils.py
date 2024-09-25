@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from utils import box_iou
+from .train_utils import box_iou
 
 def calculate_ap(pred_boxes, pred_scores, gt_boxes, iou_threshold=0.5):
     """

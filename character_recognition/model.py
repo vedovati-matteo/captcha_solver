@@ -1,14 +1,14 @@
 
 import torch
-from torchvision.models import efficientnet_b1, EfficientNet_B1_Weights
+from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights
 import torch.nn as nn
 
-from utils import CharClass
+from .utils import CharClass
 
 class CaptchaCharClassifier(nn.Module):
     def __init__(self, dropout_rate, device):
         super(CaptchaCharClassifier, self).__init__()
-        self.efficientnet = efficientnet_b1(weights=EfficientNet_B1_Weights.DEFAULT)
+        self.efficientnet = efficientnet_b0(weights=EfficientNet_B0_Weights.DEFAULT)
         num_classes = len(CharClass())
         
         # Remove the original classifier
@@ -16,7 +16,7 @@ class CaptchaCharClassifier(nn.Module):
         
         # Freeze the first half of the layers
         num_layers = len(list(self.features.parameters()))
-        for param in list(self.features.parameters())[:4 * num_layers // 5]: # 80 % of the layers
+        for param in list(self.features.parameters())[:1 * num_layers // 2]: # 50 % of the layers
             param.requires_grad = False
         
         # Add dropout and new classifier

@@ -25,7 +25,7 @@ def generate_random_string(length = None):
 
 def image_generator():
     # generate 
-    return Captcha().generate_image(generate_random_string(5))
+    return Captcha(fonts=['fonts/cour.ttf']).generate_image(generate_random_string(5))
 
 def save_image_and_annotation(index, output_dir, format="PASCAL_VOC_TXT"):
     """Generates an image and its annotation, and saves them to the disk."""
@@ -79,4 +79,4 @@ def create_dataset(output_dir, format="PASCAL_VOC_TXT", num_images=5000, max_wor
 
 
 if __name__ == "__main__":
-    create_dataset("datasets/dataset_v4", num_images=100_000, max_workers=8)
+    create_dataset("datasets/dataset_v6", num_images=200_000, max_workers=12)

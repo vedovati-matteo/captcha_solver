@@ -27,10 +27,10 @@ class Captcha:
     character_offset_dx: tuple[int, int] = (0, 4)
     character_offset_dy: tuple[int, int] = (0, 6)
     character_rotate: tuple[int, int] = (-15, 15)
-    character_warp_dx: tuple[float, float] = (0.1, 0.3)
-    character_warp_dy: tuple[float, float] = (0.2, 0.3)
+    character_warp_dx: tuple[float, float] = (0.05, 0.15)
+    character_warp_dy: tuple[float, float] = (0.1, 0.2)
     word_space_probability: float = 0.3
-    word_offset_dx: float = 0.15
+    word_offset_dx: float = 0.1
     
     def __init__(
             self,
@@ -184,9 +184,6 @@ class Captcha:
                 bounding_boxes.append({"char": c, "bb": bb})
             
             initial_offset = initial_offset + w + random.randint(-rand, 0)
-
-        # Apply random noise patterns
-        self.create_noise_dots(image, color, width=2, number=50)
         
         return image, bounding_boxes
     
@@ -206,9 +203,7 @@ class Captcha:
         
         
         im, bb = self.create_captcha_image(chars, color, background)
-        self.create_noise_dots(im, color)
-        self.create_noise_curve(im, color)
-        self.create_noise_dots(im, color2)
+        self.create_noise_dots(im, color2, number=50)
         self.create_noise_curve(im, color2)
         im = im.filter(SMOOTH)
         return im, bb

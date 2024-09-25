@@ -1,15 +1,15 @@
 import torch
 from torchvision.ops import nms
 from PIL import Image
-from .utils import *
 
-def inference(model, image_path, device, transfrom, resize, conf_threshold, nms_threshold, top_k=5):
+from .utils import transform, ResizeWithPad
+
+def inference(model, image, device, conf_threshold, nms_threshold, top_k=5):
     # Load and preprocess the image
-    image = Image.open(image_path).convert("RGB")
-    
+    resize = ResizeWithPad(224)
     image = resize(image)
     
-    image_tensor = transfrom(image).unsqueeze(0).to(device)
+    image_tensor = transform(image).unsqueeze(0).to(device)
 
     # Set model to evaluation mode
     model.eval()
@@ -17,27 +17,19 @@ def inference(model, image_path, device, transfrom, resize, conf_threshold, nms_
     with torch.no_grad():
         # Forward pass
         proposals, objectness_logits = model(image_tensor)
-        print("Raw proposals shape:", proposals.shape)
-        print("Objectness logits shape:", objectness_logits.shape)
-        print("Max objectness score:", objectness_logits.max().item())
-        print("Min objectness score:", objectness_logits.min().item())
 
         # Post-process proposals
         scores = torch.softmax(objectness_logits[0], dim=1)[:, 1]
-        print("After softmax, max score:", scores.max().item())
         boxes = proposals[0]
 
         # Filter by confidence threshold
         mask = scores > conf_threshold
-        print("Number of proposals after confidence thresholding:", mask.sum().item())
+
         filtered_boxes = boxes[mask]
         filtered_scores = scores[mask]
-        print("Filtered boxes shape:", filtered_boxes.shape)
-        print("Filtered scores shape:", filtered_scores.shape)
 
         # Apply NMS
         keep = nms(filtered_boxes, filtered_scores, iou_threshold=nms_threshold)
-        print("Number of boxes after NMS:", len(keep))
         nms_boxes = filtered_boxes[keep]
         nms_scores = filtered_scores[keep]
 
@@ -52,8 +44,9 @@ def inference(model, image_path, device, transfrom, resize, conf_threshold, nms_
     scale_h = orig_h / 224
     top_boxes[:, [0, 2]] *= scale_w
     top_boxes[:, [1, 3]] *= scale_h
+    
+    target = top_boxes.cpu().numpy().tolist()
+    
+    target_original = resize.revert_bounding_boxes(target)
 
-    return top_boxes.cpu().numpy(), top_scores.cpu().numpy()
-
-def inference_simple(model, image_path, device):
-    return inference(model, image_path, device, transform, ResizeWithPad(224), conf_threshold=0.95, nms_threshold=0.30, top_k=5)
+    return target_original, top_scores.cpu().numpy().tolist()
